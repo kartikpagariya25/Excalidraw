@@ -148,6 +148,7 @@ import "./index.scss";
 
 import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
 import { AppSidebar } from "./components/AppSidebar";
+import { getInsertIconCommand } from "./icons/insertIconCommand";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -1110,6 +1111,7 @@ const ExcalidrawWrapper = () => {
 
         <CommandPalette
           customCommandPaletteItems={[
+            getInsertIconCommand(() => excalidrawAPI),
             {
               label: t("labels.liveCollaboration"),
               category: DEFAULT_CATEGORIES.app,
