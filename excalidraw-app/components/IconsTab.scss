@@ -1,0 +1,107 @@
+.excalidraw {
+  .icons-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .icons-tab__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .icons-tab__search,
+  .icons-tab__set {
+    width: 100%;
+    box-sizing: border-box;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--input-bg-color);
+    color: var(--text-primary-color);
+    font-family: inherit;
+    font-size: 0.875rem;
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+  }
+
+  .icons-tab__message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--color-gray-60);
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .icons-tab__retry {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--button-bg, var(--island-bg-color));
+    color: var(--text-primary-color);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg);
+    }
+  }
+
+  .icons-tab__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
+    gap: 0.25rem;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .icons-tab__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-md);
+    background: transparent;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--button-hover-bg);
+      border-color: var(--default-border-color);
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.6;
+    }
+
+    img {
+      width: 1.75rem;
+      height: 1.75rem;
+      pointer-events: none;
+    }
+  }
+
+  .icons-tab__placeholder {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--border-radius-md);
+    background: var(--default-border-color);
+    opacity: 0.4;
+  }
+}

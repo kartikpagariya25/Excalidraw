@@ -29,9 +29,9 @@ export const clearIconsCache = () => {
 const parseToolPayload = async (response: Response): Promise<any> => {
   const body = await response.text();
   try {
-    const isEventStream = (
-      response.headers.get("content-type") || ""
-    ).includes("text/event-stream");
+    const isEventStream = (response.headers.get("content-type") || "").includes(
+      "text/event-stream",
+    );
     const json = isEventStream
       ? body
           .split(/\r?\n/)
@@ -113,9 +113,7 @@ const searchSet = async (
     { query, set: setId, limit },
     signal,
   );
-  const results: any[] = Array.isArray(payload?.results)
-    ? payload.results
-    : [];
+  const results: any[] = Array.isArray(payload?.results) ? payload.results : [];
   const icons: IconResult[] = [];
   for (const result of results) {
     if (typeof result?.iconId !== "string" || !isAllowedIconSet(result.set)) {

@@ -180,9 +180,7 @@ describe("searchIcons", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    await expect(searchIcons("home", "mdi")).rejects.toBeInstanceOf(
-      IconsError,
-    );
+    await expect(searchIcons("home", "mdi")).rejects.toBeInstanceOf(IconsError);
   });
 
   it("throws IconsError on isError tool results", async () => {
@@ -199,9 +197,7 @@ describe("searchIcons", () => {
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
-    await expect(searchIcons("home", "mdi")).rejects.toBeInstanceOf(
-      IconsError,
-    );
+    await expect(searchIcons("home", "mdi")).rejects.toBeInstanceOf(IconsError);
   });
 
   it("throws IconsError after the 8s timeout", async () => {
