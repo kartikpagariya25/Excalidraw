@@ -121,6 +121,23 @@ describe("searchIcons", () => {
     ]);
   });
 
+  it("doesn't cache partial 'All' results", async () => {
+    let failPh = true;
+    fetchMock.mockImplementation(async (_url, init) => {
+      const set = JSON.parse(init.body).params.arguments.set;
+      if (set === "ph" && failPh) {
+        return new Response("boom", { status: 500 });
+      }
+      return jsonRpc(searchPayload(set, ["a"]));
+    });
+
+    await searchIcons("home", null);
+    failPh = false;
+    const results = await searchIcons("home", null);
+
+    expect(results.map((r) => r.set)).toContain("ph");
+  });
+
   it("throws IconsError when every set search fails", async () => {
     fetchMock.mockImplementation(
       async () => new Response("boom", { status: 500 }),
@@ -267,6 +284,32 @@ describe("getIconSvgs", () => {
     expect(svgs.size).toBe(24);
     expect(svgs.get("mdi-icon-3")).toBe(svgFor("mdi-icon-3"));
     expect(svgs.has("mdi-missing")).toBe(false);
+  });
+
+  it("returns the batches that succeeded when one batch fails", async () => {
+    fetchMock.mockImplementation(async (_url, init) => {
+      const ids: string[] = JSON.parse(init.body).params.arguments.icon_ids;
+      if (ids.includes("mdi-icon-0")) {
+        return new Response("boom", { status: 500 });
+      }
+      return jsonRpc({
+        icons: ids.map((id) => ({ legacyId: id, svg: svgFor(id) })),
+        errors: [],
+      });
+    });
+
+    const ids = Array.from({ length: 25 }, (_, i) => `mdi-icon-${i}`);
+    const svgs = await getIconSvgs(ids);
+
+    expect(svgs.size).toBe(5);
+    expect(svgs.has("mdi-icon-24")).toBe(true);
+  });
+
+  it("throws IconsError when every batch fails", async () => {
+    fetchMock.mockImplementation(
+      async () => new Response("boom", { status: 500 }),
+    );
+    await expect(getIconSvgs(["mdi-a"])).rejects.toBeInstanceOf(IconsError);
   });
 
   it("only fetches ids not already cached", async () => {

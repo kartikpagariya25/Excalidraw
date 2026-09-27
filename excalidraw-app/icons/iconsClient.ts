@@ -157,6 +157,7 @@ export const searchIcons = async (
   }
 
   let results: IconResult[];
+  let isPartial = false;
   if (setId) {
     results = await searchSet(normalized, setId, MAX_RESULTS, signal);
   } else {
@@ -175,10 +176,14 @@ export const searchIcons = async (
       throw new IconsError("Couldn't reach the icons server");
     }
     results = interleave(fulfilled);
+    isPartial = fulfilled.length < settled.length;
   }
 
   results = results.slice(0, MAX_RESULTS);
-  searchCache.set(cacheKey, results);
+  // partial results would hide the failed sets for the rest of the session
+  if (!isPartial) {
+    searchCache.set(cacheKey, results);
+  }
   return results;
 };
 
@@ -192,7 +197,7 @@ export const getIconSvgs = async (
     batches.push(missing.slice(i, i + GET_ICONS_BATCH_SIZE));
   }
 
-  await Promise.all(
+  const settled = await Promise.allSettled(
     batches.map(async (batch) => {
       const payload = await callTool("get_icons", { icon_ids: batch }, signal);
       for (const icon of Array.isArray(payload?.icons) ? payload.icons : []) {
@@ -205,6 +210,19 @@ export const getIconSvgs = async (
       }
     }),
   );
+  if (signal?.aborted) {
+    throw new DOMException("aborted", "AbortError");
+  }
+  // one failed batch only drops its icons; fail only if nothing came back
+  const firstRejection = settled.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (
+    firstRejection &&
+    settled.every((result) => result.status === "rejected")
+  ) {
+    throw firstRejection.reason;
+  }
 
   const svgs = new Map<string, string>();
   for (const iconId of iconIds) {

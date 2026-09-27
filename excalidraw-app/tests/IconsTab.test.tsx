@@ -123,6 +123,21 @@ describe("IconsTab", () => {
     );
   });
 
+  it("hides icons whose SVG can't be parsed", async () => {
+    searchIcons.mockResolvedValue([icon("a"), icon("b")]);
+    getIconSvgs.mockResolvedValue(
+      new Map([
+        ["lucide-icons-a", SVG],
+        ["lucide-icons-b", "<svg"],
+      ]),
+    );
+    await openIconsTab();
+    typeQuery("letters");
+
+    await screen.findByRole("button", { name: "a (Lucide)" });
+    expect(screen.queryByRole("button", { name: "b (Lucide)" })).toBeNull();
+  });
+
   it("shows an error with retry that re-queries", async () => {
     searchIcons.mockRejectedValueOnce(new iconsClient.IconsError("down"));
     searchIcons.mockResolvedValueOnce([icon("database")]);

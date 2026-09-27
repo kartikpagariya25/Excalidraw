@@ -43,7 +43,9 @@ describe("insertIcon", () => {
     expect(h.elements[0]).toMatchObject({
       id: element.id,
       type: "image",
-      status: "saved",
+      // pending until the file is persisted, so collaborators don't fetch
+      // the file before it's uploaded
+      status: "pending",
       width: 64,
       height: 64,
     });

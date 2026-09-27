@@ -37,7 +37,9 @@ export const insertIcon = (
   const element = newImageElement({
     type: "image",
     fileId,
-    status: "saved",
+    // left "pending" so the app marks it "saved" only once the file is
+    // persisted — collaborators won't try to fetch it before it's uploaded
+    status: "pending",
     x: -scrollX + width / 2 / zoom.value - size / 2,
     y: -scrollY + height / 2 / zoom.value - size / 2,
     width: size,

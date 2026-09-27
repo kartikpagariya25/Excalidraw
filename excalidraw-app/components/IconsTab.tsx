@@ -70,7 +70,11 @@ export const IconsTab = () => {
         if (controller.signal.aborted) {
           return;
         }
-        const visible = found.filter((result) => previews.has(result.iconId));
+        // hide icons the server couldn't provide or that aren't valid SVG
+        const visible = found.filter((result) => {
+          const svg = previews.get(result.iconId);
+          return !!svg && toPreviewURL(svg, "#000") !== null;
+        });
         setSvgs(previews);
         setResults(visible);
         setStatus(visible.length ? "results" : "empty");

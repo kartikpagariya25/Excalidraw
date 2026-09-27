@@ -90,7 +90,7 @@ excalidraw-app/
   2. `svg = prepareIconSvg(rawSvg, color)`; `dataURL = svgToDataURL(svg)`.
   3. `fileId` = `icon-${hashString(`${iconId}|${color}`)}` using `hashString` from `@excalidraw/element`, so repeat inserts share one file.
   4. `api.addFiles([{ id: fileId, dataURL, mimeType: "image/svg+xml", created: Date.now() }])`.
-  5. Create the element with `newImageElement` from `@excalidraw/element` (`fileId`, `status: "saved"`, 64×64, positioned so its center is the viewport center computed from `scrollX/scrollY/zoom/width/height`).
+  5. Create the element with `newImageElement` from `@excalidraw/element` (`fileId`, `status: "pending"` — the app flips it to `"saved"` once the file is persisted (`Portal.queueFileUpload` / `LocalData`), so collaborators never fetch a not-yet-uploaded file, 64×64, positioned so its center is the viewport center computed from `scrollX/scrollY/zoom/width/height`).
   6. `api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), el], appState: { selectedElementIds: { [el.id]: true } }, captureUpdate: CaptureUpdateAction.IMMEDIATELY })` so it is undoable.
 
 ### `IconsTab.tsx`
