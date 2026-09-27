@@ -33,8 +33,15 @@ A single exported constant `ICON_SETS` in `excalidraw-app/icons/iconSets.ts`:
 | `heroicons`      | Heroicons             | MIT        |
 | `mdi`            | Material Design Icons | Apache-2.0 |
 
-- Set filter "All": one `search_icons` call with `limit: 200`, `include_svg: true`; results whose `set` is not in the allowlist are dropped client-side; the first 60 remaining are shown.
-- Specific set selected: `search_icons` with `set: <id>`, `limit: 60`, `include_svg: true`.
+- Set filter "All": five parallel `search_icons` calls (one per allowed set, `limit: 12`), results interleaved round-robin (up to 60). A single unfiltered search is not used: measured on 2026-09-27, 200 unfiltered results for "arrow" contained only 4 from allowed sets. If some set searches fail, the others are shown; only if all fail is it an error.
+- Specific set selected: `search_icons` with `set: <id>`, `limit: 60`.
+- Any result whose `set` is not in the allowlist is dropped client-side.
+
+## Server quirks (verified 2026-09-27)
+
+- `search_icons` returns SVG previews only for the first ~8 results even with `include_svg: true`, so previews are batch-fetched with `get_icons` (max 20 ids per call).
+- The short id form is unreliable: `heroicons:home` resolves to `house` and fails. The long form returned as `iconId` in search results (e.g. `heroicons-home`, `lucide-icons-database`) works for all five sets with both `get_icons` and `get_icon_svg`. **All fetches use the long `iconId`**; `get_icons` results map back via their `legacyId` field.
+- `get_icons` returns `{ icons: [{ id, legacyId, set, name, svg }], errors: [{ id, error }] }`; missing icons appear in `errors`, not as a failed call.
 
 ## Architecture
 
@@ -62,15 +69,15 @@ excalidraw-app/
   - `application/json`: read `result.content[0].text` and `JSON.parse` it (the server double-encodes the payload as a JSON string).
   - `text/event-stream`: take the last `data:` line, parse it as the JSON-RPC envelope, then as above.
   - JSON-RPC `error`, `result.isError === true`, non-2xx status, or unparsable body → throw `IconsError` with a user-safe message.
-- `searchIcons(query, setId | null, signal): Promise<IconResult[]>` where `IconResult = { id: string; name: string; set: string; svg?: string }` (`id` is the `set:name` form, e.g. `lucide:database`).
-- `getIconSvg(id, signal): Promise<string>` → reads `svg` from the `get_icon_svg` payload.
+- `searchIcons(query, setId | null, signal): Promise<IconResult[]>` where `IconResult = { iconId: string; name: string; set: IconSetId }` (`iconId` is the long form, e.g. `lucide-icons-database`).
+- `getIconSvgs(iconIds, signal): Promise<Map<string, string>>` → returns SVGs for the requested long ids, serving cached ones and batch-fetching the rest with `get_icons` in chunks of 20 (chunks in parallel). Ids the server reports in `errors` are simply absent from the map.
 - 8 s timeout per request (via `AbortController` combined with the caller's signal).
-- In-memory session caches: `Map<string, IconResult[]>` keyed by `${setId ?? "all"}|${query.trim().toLowerCase()}`, and `Map<string, string>` for SVGs keyed by icon id. Search results that include `svg` also populate the SVG cache.
+- In-memory session caches: `Map<string, IconResult[]>` keyed by `${setId ?? "all"}|${query.trim().toLowerCase()}`, and `Map<string, string>` for SVGs keyed by long icon id. Search results that happen to include `svg` also populate the SVG cache.
 
 ### `iconSvg.ts` (pure, no DOM required beyond `DOMParser`)
 
 - `prepareIconSvg(svg: string, color: string, size = 64): string`:
-  - Replaces every `currentColor` (attribute values and inline styles) with `color`.
+  - Replaces every `currentColor` (case-insensitive; attribute values and inline styles) with `color`. If `color` is empty or `"transparent"`, uses `#1e1e1e` instead so the icon is never invisible. (Dark mode needs no special handling: the renderer already inverts SVG images in dark theme, matching how stroke colors are inverted — `renderElement.ts`, `shouldInvertImage`.)
   - Sets root `width` and `height` to `size`; if the root has no `viewBox`, derives it from the original width/height (default `0 0 24 24`).
   - Ensures `xmlns="http://www.w3.org/2000/svg"` is present.
   - Hardcoded colors (e.g. brand logos) are left untouched.
@@ -78,7 +85,7 @@ excalidraw-app/
 
 ### `insertIcon.ts`
 
-- `insertIcon(api, iconId, rawSvg)`:
+- `insertIcon(api, iconId, rawSvg)` (`iconId` is the long form):
   1. `color = api.getAppState().currentItemStrokeColor`.
   2. `svg = prepareIconSvg(rawSvg, color)`; `dataURL = svgToDataURL(svg)`.
   3. `fileId` = `icon-${hashString(`${iconId}|${color}`)}` using `hashString` from `@excalidraw/element`, so repeat inserts share one file.
@@ -92,7 +99,8 @@ excalidraw-app/
 - Set filter: a `<select>` with "All" + the allowlist labels.
 - Each new query aborts the in-flight one.
 - States: idle hint, loading (spinner), results grid (buttons with the SVG preview rendered via `<img src={dataURL}>` — never `dangerouslySetInnerHTML`), empty ("No icons found"), error (message + Retry button).
-- Each grid button has `title`/`aria-label` = `"<name> (<set label>)"`; click → `getIconSvg` (cache hit if preview already had it) → `insertIcon`. While inserting, the button shows a busy state; failures show a toast via `api.setToast`.
+- After results arrive, previews are loaded with `getIconSvgs(allResultIds)`; buttons show a placeholder until their preview arrives, and results whose SVG the server can't provide are removed from the grid.
+- Each grid button has `title`/`aria-label` = `"<name> (<set label>)"`; click → `getIconSvgs([iconId])` (a cache hit once previews loaded) → `insertIcon`. While inserting, the button shows a busy state; failures show a toast via `api.setToast`.
 - Gets the API via `useExcalidrawAPI()` (exported from `@excalidraw/excalidraw`) and `useUIAppState()` for theme; styled with existing Excalidraw CSS variables so light/dark both work.
 
 ### `AppSidebar.tsx`
@@ -113,7 +121,7 @@ excalidraw-app/
 ## Testing
 
 - `iconSvg.test.ts`: tints `currentColor` in attributes and `style`; sets width/height; adds missing viewBox; leaves hardcoded colors alone; data URL round-trips non-ASCII.
-- `iconsClient.test.ts` (mocked `fetch`): JSON response parsing; SSE response parsing; JSON-RPC error; `isError` result; non-2xx; timeout; allowlist filtering for "All"; cache hit avoids a second fetch.
+- `iconsClient.test.ts` (mocked `fetch`): JSON response parsing; SSE response parsing; JSON-RPC error; `isError` result; non-2xx; timeout; "All" fans out to five set searches and interleaves; partial set failure still returns results; allowlist filtering; `getIconSvgs` chunks by 20, maps back via `legacyId`, skips `errors`; cache hits avoid a second fetch.
 - `IconsTab.test.tsx` (mocked client): type query → results render; click → scene contains a new image element with a file whose SVG contains the current stroke color; error state shows Retry and retry re-queries.
 - Before committing: `yarn test:typecheck`, `yarn test:update`, `yarn fix`.
 
